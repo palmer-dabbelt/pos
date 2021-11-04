@@ -1,0 +1,10 @@
+AC_INIT([pos], [0.0])
+AC_CONFIG_MACRO_DIRS([m4])
+AM_INIT_AUTOMAKE([foreign subdir-objects])
+
+AC_LANG([C++])
+AC_PROG_CXX
+AX_CXX_COMPILE_STDCXX_17([noext])
+
+AC_CONFIG_FILES([Makefile])
+AC_OUTPUT
