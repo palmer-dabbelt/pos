@@ -7,37 +7,42 @@ ssize_t address_space::map(va_t vaddr, size_t bytes, bool r, bool w, bool x)
 {
     pa_t pml4p = ptbr & ~0xFFF;
     pa_t pml4o = (vaddr & (0x1FFLL << 39)) & 0x1FF;
-    uint64_t *pml4e = (uint64_t*)(pml4p + pml4o);
+    uint64_t *pml4e = (uint64_t*)phys2host(pml4p + pml4o);
     if (!(*pml4e & 1)) {
         pa_t page = palloc();
-        *pml4e = page & 1;
+        *pml4e = page | 0x7;
     }
 
     pa_t pdpp = *pml4e & ~0xFFF;
     pa_t pdpo = (vaddr & (0x1FFLL << 30)) & 0x1FF;
-    uint64_t *pdpe = (uint64_t*)(pdpp + pdpo);
+    uint64_t *pdpe = (uint64_t*)phys2host(pdpp + pdpo);
     if (!(*pdpe & 1)) {
         pa_t page = palloc();
-        *pml4e = page & 1;
+        *pdpe = page | 0x7;
     }
 
     pa_t pdp = *pdpe & ~0xFFF;
     pa_t pdo = (vaddr & (0x1FFLL << 21)) & 0x1FF;
-    uint64_t *pde = (uint64_t*)(pdp + pdo);
+    uint64_t *pde = (uint64_t*)phys2host(pdp + pdo);
     if (!(*pde & 1)) {
         pa_t page = palloc();
-        *pml4e = page & 1;
+        *pde = page | 0x7;
     }
 
     pa_t ptp = *pdpe & ~0xFFF;
     pa_t pto = (vaddr & (0x1FFLL << 12)) & 0x1FF;
-    uint64_t *pte = (uint64_t*)(ptp + pto);
+    uint64_t *pte = (uint64_t*)phys2host(ptp + pto);
     if (!(*pte & 1)) {
         pa_t page = palloc();
-        *pml4e = page & 1;
+        *pte = page | 0x7;
     }
 
+    pa_t ppp = *pte & ~0xFFF;
     pa_t ppo = vaddr & 0xFFF;
+
+    if (ppp + ppo != virt2phys(vaddr))
+        abort();
+
     return 0xFFF - ppo;
 }
 
@@ -45,25 +50,25 @@ address_space::pa_t address_space::virt2phys(va_t vaddr) const
 {
     pa_t pml4p = ptbr & ~0xFFF;
     pa_t pml4o = (vaddr & (0x1FFLL << 39)) & 0x1FF;
-    uint64_t *pml4e = (uint64_t*)(pml4p + pml4o);
+    uint64_t *pml4e = (uint64_t*)phys2host(pml4p + pml4o);
     if (!(*pml4e & 1))
         return -1;
 
     pa_t pdpp = *pml4e & ~0xFFF;
     pa_t pdpo = (vaddr & (0x1FFLL << 30)) & 0x1FF;
-    uint64_t *pdpe = (uint64_t*)(pdpp + pdpo);
+    uint64_t *pdpe = (uint64_t*)phys2host(pdpp + pdpo);
     if (!(*pdpe & 1))
         return -1;
 
     pa_t pdp = *pdpe & ~0xFFF;
     pa_t pdo = (vaddr & (0x1FFLL << 21)) & 0x1FF;
-    uint64_t *pde = (uint64_t*)(pdp + pdo);
+    uint64_t *pde = (uint64_t*)phys2host(pdp + pdo);
     if (!(*pde & 1))
         return -1;
 
     pa_t ptp = *pdpe & ~0xFFF;
     pa_t pto = (vaddr & (0x1FFLL << 12)) & 0x1FF;
-    uint64_t *pte = (uint64_t*)(ptp + pto);
+    uint64_t *pte = (uint64_t*)phys2host(ptp + pto);
     if (!(*pte & 1))
         return -1;
 
@@ -83,7 +88,7 @@ address_space::pa_t address_space::palloc(void)
             continue;
 
         state[i].allocated = true;
-        return i;
+        return i * bytes_per_page + pa_base();
     }
 
     return -1;
@@ -91,10 +96,18 @@ address_space::pa_t address_space::palloc(void)
 
 ssize_t address_space::copy_to_va(va_t vaddr, uint8_t *data, size_t bytes)
 {
-    return 0;
+    for (size_t i = 0; i < bytes; ++i) {
+        auto ha = virt2host(vaddr + i);
+        ha[i] = data[i];
+    }
+    return bytes;
 }
 
 ssize_t address_space::zero_va(va_t vaddr, size_t bytes)
 {
-    return 0;
+    for (size_t i = 0; i < bytes; ++i) {
+        auto ha = virt2host(vaddr + i);
+        ha[i] = 0;
+    }
+    return bytes;
 }

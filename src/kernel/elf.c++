@@ -12,15 +12,20 @@ using namespace pos::kernel;
 std::shared_ptr<thread> elf::create_init_thread(void) const
 {
     auto t = std::make_shared<thread>();
-    load(t->mem());
+    uint64_t entry;
+    if (!load(t->mem(), entry))
+        abort();
+    t->set_pc(entry);
     return t;
 }
 
-bool elf::load(address_space& mem, size_t offset) const
+bool elf::load(address_space& mem, uint64_t& entry, size_t offset) const
 {
     auto fd = open(path.c_str(), O_RDONLY);
-    if (fd != 0)
+    if (fd <= 0) {
+        perror("elf::load() unable to open input file");
         return false;
+    }
 
     struct stat statbuf;
     if (fstat(fd, &statbuf) != 0) {
@@ -35,6 +40,10 @@ bool elf::load(address_space& mem, size_t offset) const
     }
 
     Elf64_Ehdr *ehdr = (Elf64_Ehdr *)base;
+
+    entry = ehdr->e_entry;
+    fprintf(stderr, "Setting entry to 0x%016lx\n", entry);
+
     for (size_t i = 0; i < ehdr->e_phnum; ++i) {
         Elf64_Phdr *phdr = ((Elf64_Phdr *)(base + ehdr->e_phoff)) + i;
 

@@ -3,6 +3,7 @@
 #ifndef POS__KERNEL__ADDRESS_SPACE_HXX
 #define POS__KERNEL__ADDRESS_SPACE_HXX
 
+#include <sys/mman.h>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
@@ -32,16 +33,35 @@ namespace pos {
         public:
             address_space(size_t bytes=128*1024*1024)
             : pages(bytes / bytes_per_page),
-              backing_store((ha_t)malloc(bytes)),
-              state(new page_state[bytes / bytes_per_page]),
+              backing_store((ha_t)mmap(NULL,
+                                       pages * bytes_per_page,
+                                       PROT_READ | PROT_WRITE,
+                                       MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE,
+                                       -1,
+                                       0)),
+              state(new page_state[pages]),
               state_uninitialized(0),
               ptbr(palloc())
             {}
 
+            ~address_space(void)
+            {
+                delete[] state;
+                munmap(backing_store, pages * bytes_per_page);
+            }
+
         public:
+            pa_t pa_base (void) const { return 0x10000; }
+            pa_t pa_bound(void) const { return pages * bytes_per_page; }
+            ha_t ha_base (void) const { return backing_store; }
+            ha_t ha_bound(void) const { return (ha_t)pa_bound(); }
+
+            pa_t ptbr_pa(void) const { return ptbr; }
+
             ssize_t map(va_t vaddr, size_t bytes, bool r, bool w, bool x);
             pa_t virt2phys(va_t vaddr) const;
-            ha_t virt2host(va_t va) const { return backing_store + virt2phys(va); }
+            ha_t phys2host(pa_t pa) const { return ha_base() + pa - pa_base(); }
+            ha_t virt2host(va_t va) const { return phys2host(virt2phys(va)); }
 
             ssize_t copy_to_va(va_t vaddr, uint8_t *data, size_t bytes);
             ssize_t zero_va(va_t vaddr, size_t bytes);
