@@ -14,12 +14,20 @@ namespace pos {
         class thread {
         private:
             address_space memory;
+            int kvm_fd;
+
+        public:
+            thread(void)
+            : memory(),
+              kvm_fd(start_kvm_thread(memory))
+            {}
 
         public:
             auto& mem(void) { return memory; }
-
-        public:
             int join(void);
+
+        private:
+            static int start_kvm_thread(address_space& mem);
         };
     }
 }
