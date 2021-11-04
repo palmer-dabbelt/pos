@@ -13,3 +13,6 @@
 /install-sh
 /missing
 /pos
+*.log
+*.trs
+/test-driver
