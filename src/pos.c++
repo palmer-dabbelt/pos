@@ -2,6 +2,7 @@
 
 #include <cstring>
 #include <optional>
+#include "kernel/elf.h++"
 
 void help(const char *argv0)
 {
@@ -32,4 +33,8 @@ int main(int argc, char **argv)
         help(argv[0]);
         return 1;
     }
+
+    auto elf = pos::kernel::elf::load(argv[command_offset.value()]);
+    auto thread = elf->create_init_thread();
+    return thread->join();
 }
