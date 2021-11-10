@@ -103,6 +103,7 @@ void thread::kvm::thread_main(void)
 
     sregs.cs = [](){
         struct kvm_segment s;
+        memset(&s, 0, sizeof(s));
         s.base = 0;
         s.limit = 0xffffffff;
         s.selector = 1 << 3;
@@ -155,6 +156,11 @@ void thread::kvm::thread_main(void)
         if (r < 0) abort();
 
         switch (run->exit_reason) {
+        case KVM_EXIT_SHUTDOWN:
+            fprintf(stderr, "KVM_EXIT_SHUTDOWN\n");
+            abort();
+            break;
+
         case KVM_EXIT_DEBUG:
             fprintf(stderr, "KVM_EXIT_DEBUG\n");
             abort();
