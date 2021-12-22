@@ -3,4 +3,4 @@
 set -ex
 
 test_name="$(basename -s .bash $0)"
-${srcdir}/pos -- check_$test_name
+${srcdir}/pos -- check-$test_name
