@@ -42,8 +42,42 @@ using namespace pos::kernel;
 #define CR4_SMEP (1U << 20)
 #define CR4_SMAP (1U << 21)
 
+#define EFER_SCE (1U <<  0)
 #define EFER_LME (1U <<  8)
 #define EFER_LMA (1U << 10)
+
+template <int N> struct kvm_msrs_wrapper {
+    __u32 nmsrs;
+    __u32 pad;
+    struct kvm_msr_entry entries[N];
+
+    kvm_msrs_wrapper(void)
+    : nmsrs(N)
+    {}
+
+    struct kvm_msrs *kvm_ptr(void) const { return (struct kvm_msrs *)&nmsrs; }
+};
+
+/*
+ * From https://wiki.osdev.org/Getting_to_Ring_3
+ */
+struct gdt_entry_bits {
+	unsigned int limit_low              : 16;
+	unsigned int base_low               : 24;
+	unsigned int accessed               :  1;
+	unsigned int read_write             :  1; // readable for code, writable for data
+	unsigned int conforming_expand_down :  1; // conforming for code, expand down for data
+	unsigned int code                   :  1; // 1 for code, 0 for data
+	unsigned int code_data_segment      :  1; // should be 1 for everything but TSS and LDT
+	unsigned int DPL                    :  2; // privilege level
+	unsigned int present                :  1;
+	unsigned int limit_high             :  4;
+	unsigned int available              :  1; // only used in software; has no effect on hardware
+	unsigned int long_mode              :  1;
+	unsigned int big                    :  1; // 32-bit opcodes for code, uint32_t stack for data
+	unsigned int gran                   :  1; // 1 to use 4k page addressing, 0 for byte addressing
+	unsigned int base_high              :  8;
+} __attribute__((packed));
 
 void thread::kvm::thread_main(void)
 {
@@ -68,7 +102,7 @@ void thread::kvm::thread_main(void)
         m.slot = 0;
         m.flags = 0;
         m.guest_phys_addr = memory.pa_base();
-        m.memory_size = memory.pa_bound();
+        m.memory_size = memory.pa_size_bytes();
         m.userspace_addr = (uint64_t)(memory.ha_base());
 
         int kvmm = ioctl(vm_fd, KVM_SET_USER_MEMORY_REGION, &m);
@@ -99,17 +133,17 @@ void thread::kvm::thread_main(void)
     sregs.cr0  = CR0_PE | CR0_MP | CR0_ET | CR0_NE | CR0_WP | CR0_AM | CR0_PG;
     sregs.cr3  = memory.ptbr_pa();
     sregs.cr4  = CR4_PAE;
-    sregs.efer = EFER_LME | EFER_LMA;
+    sregs.efer = EFER_LME | EFER_LMA | EFER_SCE;
 
     sregs.cs = [](){
         struct kvm_segment s;
         memset(&s, 0, sizeof(s));
         s.base = 0;
         s.limit = 0xffffffff;
-        s.selector = 1 << 3;
+        s.selector = 3 << 3;
         s.present = 1;
         s.type = 11;
-        s.dpl = 0;
+        s.dpl = 3;
         s.db = 0;
         s.s = 1;
         s.l = 1;
@@ -119,22 +153,77 @@ void thread::kvm::thread_main(void)
     sregs.ds = sregs.es = sregs.fs = sregs.gs = sregs.ss = [&](){
         struct kvm_segment s = sregs.cs;
         s.type = 3;
-        s.selector = 2 << 3;
+        s.selector = 4 << 3;
         return s;
     }();
 
+    /*
+     * In order to handle SYSCALL we need a GDT, because
+     */
+    auto gdt_va = 0x10000000;
+    memory.map(gdt_va, 4096, 1, 1, 1);
+    sregs.gdt.base = gdt_va;
+    sregs.gdt.limit = (4096/8);
+
+    auto gdt_ha = (struct gdt_entry_bits *)(memory.virt2host(gdt_va));
+    memset(gdt_ha, 0, 4096);
+    gdt_ha[1].limit_low = 0xFFFF;
+    gdt_ha[1].base_low = 0;
+    gdt_ha[1].accessed = 0;
+    gdt_ha[1].read_write = 1;
+    gdt_ha[1].conforming_expand_down = 0;
+    gdt_ha[1].code = 1;
+    gdt_ha[1].code_data_segment = 1;
+    gdt_ha[1].DPL = 0;
+    gdt_ha[1].present = 1;
+    gdt_ha[1].limit_high = 0xF;
+    gdt_ha[1].available = 1;
+    gdt_ha[1].long_mode = 1;
+    gdt_ha[1].big = 1;
+    gdt_ha[1].gran = 1;
+    gdt_ha[1].base_high = 0;
+
+    gdt_ha[2] = gdt_ha[1];
+    gdt_ha[2].code = 0;
+
+    gdt_ha[3] = gdt_ha[1];
+    gdt_ha[3].DPL = 3;
+
+    gdt_ha[4] = gdt_ha[4];
+    gdt_ha[4].code = 0;
+
+    /*
+     * This is really just a shim that turns any syscall from the guest into a
+     * hypervisor call, so we can deal with it via our syscall emulation code.
+     * KVM already gives us access to the relevant registers, so we can just
+     * sysret right after that.
+     */
+    auto kernel_va = 0x20000000;
+    memory.map(kernel_va, 4096, 1, 1, 1);
+    memory.writeb(kernel_va + 0, 0x90); /* nop */
+    memory.writeb(kernel_va + 1, 0xf4); /* hlt */
+    memory.writeb(kernel_va + 2, 0x48); /* sysretq */
+    memory.writeb(kernel_va + 3, 0x0f);
+    memory.writeb(kernel_va + 4, 0x07);
+
     {
-        struct kvm_guest_debug d;
-        d.control = KVM_GUESTDBG_ENABLE | KVM_GUESTDBG_SINGLESTEP;
-        auto r = ioctl(cpu_fd, KVM_SET_GUEST_DEBUG, &d);
-        if (r < 0) abort();
+        kvm_msrs_wrapper<2> m;
+        m.entries[0].index = 0xC0000081;
+        m.entries[0].data = ((1UL << 3) << 48) | ((2UL << 3) << 32);
+        m.entries[1].index = 0xC0000082;
+        m.entries[1].data = kernel_va;
+
+        auto r = ioctl(cpu_fd, KVM_SET_MSRS, m.kvm_ptr());
+        if (r != 2) {
+            perror("unable to set LSTAR");
+            abort();
+        }
     }
 
     /*
      * KVM has been set up, so we can get on with processing commands from the
      * rest of the system.
      */
-    fprintf(stderr, "KVM set to ready\n");
     state = thread_state::READY;
     state_lock.unlock();
     state_signal.notify_all();
@@ -144,26 +233,49 @@ void thread::kvm::thread_main(void)
         state_lock.unlock();
         wait_for_state(thread_state::RUNNING);
 
-        fprintf(stderr, "KVM running at 0x%016lx\n", regs.rip);
+#if POS_DEBUG_KVM
+        fprintf(stderr, "KVM running at 0x%016llx\n", regs.rip);
+
+        for (size_t i = 0; i < 16; ++i) {
+            auto va = regs.rip + i;
+            fprintf(stderr, "M[0x%016llx] = 0x%02x\n", va, memory.readb(va));
+        }
+#endif
 
         auto r = ioctl(cpu_fd, KVM_SET_REGS, &regs);
         if (r < 0) abort();
-
         r = ioctl(cpu_fd, KVM_SET_SREGS, &sregs);
         if (r < 0) abort();
+
+#if POS_DEBUG_KVM
+        {
+            struct kvm_guest_debug d;
+            d.control = KVM_GUESTDBG_ENABLE | KVM_GUESTDBG_SINGLESTEP;
+            auto r = ioctl(cpu_fd, KVM_SET_GUEST_DEBUG, &d);
+            if (r < 0) abort();
+        }
+#endif
 
         r = ioctl(cpu_fd, KVM_RUN, 0);
         if (r < 0) abort();
 
+        r = ioctl(cpu_fd, KVM_GET_REGS, &regs);
+        if (r < 0) abort();
+        r = ioctl(cpu_fd, KVM_GET_SREGS, &sregs);
+        if (r < 0) abort();
+
         switch (run->exit_reason) {
         case KVM_EXIT_SHUTDOWN:
-            fprintf(stderr, "KVM_EXIT_SHUTDOWN\n");
+            fprintf(stderr, "KVM_EXIT_SHUTDOWN: pc=0x%016llx\n", regs.rip);
             abort();
             break;
 
         case KVM_EXIT_DEBUG:
             fprintf(stderr, "KVM_EXIT_DEBUG\n");
-            abort();
+            break;
+
+        case KVM_EXIT_HLT:
+            regs.rax = handle_syscall(regs.rax, regs.rdi);
             break;
 
         default:
@@ -172,21 +284,28 @@ void thread::kvm::thread_main(void)
             break;
         }
 
-        r = ioctl(cpu_fd, KVM_GET_REGS, &regs);
-        if (r < 0) abort();
-
-        r = ioctl(cpu_fd, KVM_GET_SREGS, &sregs);
-        if (r < 0) abort();
-
         state_lock.lock();
-    } while (state != thread_state::KILLED);
+    } while (state != thread_state::DONE);
     state_lock.unlock();
+}
+
+uint64_t thread::kvm::handle_syscall(uint64_t nr, uint64_t arg0)
+{
+    switch (nr) {
+    case 60: /* exit() */
+        state = thread_state::DONE;
+        state_signal.notify_all();
+        return -1;
+
+    default:
+        fprintf(stderr, "unknown syscall %lx\n", nr);
+        abort();
+    }
 }
 
 int thread::join(void)
 {
     vm.run();
     vm.wait_for_state(kvm::thread_state::DONE);
-    fprintf(stderr, "VM is done\n");
     return vm.regs.rdi;
 }

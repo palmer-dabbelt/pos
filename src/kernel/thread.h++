@@ -23,7 +23,6 @@ namespace pos {
                     INIT,
                     READY,
                     RUNNING,
-                    KILLED,
                     DONE,
                 };
 
@@ -48,9 +47,12 @@ namespace pos {
                   state_lock(),
                   kvm_thread(thread_main_wrapper, this)
                 {
-                    fprintf(stderr, "Waiting for KVM to initialize\n");
                     wait_for_state(thread_state::READY);
-                    fprintf(stderr, "KVM initialized\n");
+                }
+
+                ~kvm(void)
+                {
+                    kvm_thread.join();
                 }
 
                 void wait_for_state(thread_state s)
@@ -66,7 +68,6 @@ namespace pos {
                     if (state == thread_state::READY)
                         state = thread_state::RUNNING;
                     state_lock.unlock();
-                    fprintf(stderr, "VM is running\n");
                     state_signal.notify_all();
                 }
 
@@ -74,6 +75,7 @@ namespace pos {
                 static void thread_main_wrapper(kvm* that)
                 { return that->thread_main(); }
                 void thread_main(void);
+                uint64_t handle_syscall(uint64_t nr, uint64_t arg0);
             };
 
             address_space memory;

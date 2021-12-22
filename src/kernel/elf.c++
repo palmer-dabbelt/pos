@@ -42,7 +42,6 @@ bool elf::load(address_space& mem, uint64_t& entry, size_t offset) const
     Elf64_Ehdr *ehdr = (Elf64_Ehdr *)base;
 
     entry = ehdr->e_entry;
-    fprintf(stderr, "Setting entry to 0x%016lx\n", entry);
 
     for (size_t i = 0; i < ehdr->e_phnum; ++i) {
         Elf64_Phdr *phdr = ((Elf64_Phdr *)(base + ehdr->e_phoff)) + i;

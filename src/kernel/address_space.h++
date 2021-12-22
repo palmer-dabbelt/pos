@@ -27,7 +27,6 @@ namespace pos {
             size_t pages;
             ha_t backing_store;
             page_state *state;
-            size_t state_uninitialized;
             pa_t ptbr;
 
         public:
@@ -39,8 +38,7 @@ namespace pos {
                                        MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE,
                                        -1,
                                        0)),
-              state(new page_state[pages]),
-              state_uninitialized(0),
+              state(allocate_page_state(pages)),
               ptbr(palloc())
             {}
 
@@ -51,10 +49,10 @@ namespace pos {
             }
 
         public:
-            pa_t pa_base (void) const { return 0x10000; }
-            pa_t pa_bound(void) const { return pages * bytes_per_page; }
-            ha_t ha_base (void) const { return backing_store; }
-            ha_t ha_bound(void) const { return (ha_t)pa_bound(); }
+            pa_t   pa_base      (void) const { return 0x10000; }
+            size_t pa_size_bytes(void) const { return pages * bytes_per_page; }
+            ha_t   ha_base      (void) const { return backing_store; }
+            size_t ha_size_bytes(void) const { return pa_size_bytes(); }
 
             pa_t ptbr_pa(void) const { return ptbr; }
 
@@ -66,8 +64,13 @@ namespace pos {
             ssize_t copy_to_va(va_t vaddr, uint8_t *data, size_t bytes);
             ssize_t zero_va(va_t vaddr, size_t bytes);
 
+            uint8_t readb(va_t va) const { return virt2host(va)[0];}
+            void writeb(va_t va, uint8_t d) { virt2host(va)[0] = d; }
+
         private:
             pa_t palloc(void);
+
+            static struct page_state *allocate_page_state(size_t pages);
         };
     }
 }
