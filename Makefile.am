@@ -22,4 +22,9 @@ check_nano_false_SOURCES = test/nano_false.S
 check_nano_false_CFLAGS  = -static -nostdlib -ffreestanding
 XFAIL_TESTS += test/pos/nano_false.bash
 
+check_PROGRAMS += check-nano_hlt
+check_nano_hlt_SOURCES = test/nano_hlt.S
+check_nano_hlt_CFLAGS  = -static -nostdlib -ffreestanding
+XFAIL_TESTS += test/pos/nano_hlt.bash
+
 TESTS += $(XFAIL_TESTS)
