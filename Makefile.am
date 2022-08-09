@@ -4,6 +4,7 @@ bin_PROGRAMS = pos
 pos_SOURCES = \
 	src/kernel/address_space.c++ \
 	src/kernel/elf.c++ \
+	src/kernel/files.c++ \
 	src/kernel/thread.c++ \
 	src/pos.c++
 
@@ -26,5 +27,15 @@ check_PROGRAMS += check-nano_hlt
 check_nano_hlt_SOURCES = test/nano_hlt.S
 check_nano_hlt_CFLAGS  = -static -nostdlib -ffreestanding
 XFAIL_TESTS += test/pos/nano_hlt.bash
+
+check_PROGRAMS += check-nanotls_true
+check_nanotls_true_SOURCES = test/nanotls_true.c test/nanotls_true-testval.c
+check_nanotls_true_CFLAGS  = -static -nostdlib -ffreestanding -O3 -fpie
+TESTS += test/pos/nanotls_true.bash
+
+check_PROGRAMS += check-nanotls_false
+check_nanotls_false_SOURCES = test/nanotls_false.c test/nanotls_false-testval.c
+check_nanotls_false_CFLAGS  = -static -nostdlib -ffreestanding -O3 -fpie
+XFAIL_TESTS += test/pos/nanotls_false.bash
 
 TESTS += $(XFAIL_TESTS)

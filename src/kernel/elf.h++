@@ -21,7 +21,8 @@ namespace pos {
             : path(path_)
             {}
 
-            bool load(address_space& mem, uint64_t& entry, size_t offset=0) const;
+            bool load(address_space& mem, uint64_t& entry, uint64_t& phdr,
+                      uint64_t& phent, size_t offset=0) const;
             std::shared_ptr<thread> create_init_thread(void) const;
 
         public:

@@ -4,6 +4,7 @@
 #define POS__KERNEL__THREAD_HXX
 
 #include "address_space.h++"
+#include "files.h++"
 #include <linux/kvm.h>
 #include <condition_variable>
 #include <mutex>
@@ -20,6 +21,7 @@ namespace pos {
             class kvm {
             public:
                 enum class thread_state {
+                    CREATED,
                     INIT,
                     READY,
                     RUNNING,
@@ -28,6 +30,7 @@ namespace pos {
 
             private:
                 address_space& memory;
+                kernel::files& files;
 
                 thread_state state;
                 std::mutex state_lock;
@@ -39,15 +42,17 @@ namespace pos {
             public:
                 struct kvm_regs regs;
                 struct kvm_sregs sregs;
+                uint64_t phdr, phent;
 
             public:
-                kvm(address_space& _memory)
+                kvm(address_space& _memory, decltype(files)& _files)
                 : memory(_memory),
-                  state(thread_state::INIT),
+                  files(_files),
+                  state(thread_state::CREATED),
                   state_lock(),
-                  kvm_thread(thread_main_wrapper, this)
+                  kvm_thread(thread_main_wrapper, this),
+                  phdr(-1)
                 {
-                    wait_for_state(thread_state::READY);
                 }
 
                 ~kvm(void)
@@ -62,11 +67,24 @@ namespace pos {
                         state_signal.wait(l, [&]{ return state == s; });
                 }
 
+                void done_with_init(void)
+                {
+                    state_lock.lock();
+                    if (state == thread_state::CREATED)
+                        state = thread_state::INIT;
+                    else
+                        abort();
+                    state_lock.unlock();
+                    state_signal.notify_all();
+                }
+
                 void run(void)
                 {
                     state_lock.lock();
                     if (state == thread_state::READY)
                         state = thread_state::RUNNING;
+                    else
+                        abort();
                     state_lock.unlock();
                     state_signal.notify_all();
                 }
@@ -75,22 +93,34 @@ namespace pos {
                 static void thread_main_wrapper(kvm* that)
                 { return that->thread_main(); }
                 void thread_main(void);
-                uint64_t handle_syscall(uint64_t nr, uint64_t arg0);
+                uint64_t handle_syscall(uint64_t nr, uint64_t arg0,
+                                        uint64_t arg1, uint64_t arg2,
+                                        uint64_t arg3, uint64_t arg4,
+                                        uint64_t arg5);
             };
 
             address_space memory;
+            kernel::files files;
+
             kvm vm;
 
         public:
             thread(void)
             : memory(),
-              vm(memory)
+              files(0, 1, 2),
+              vm(memory, files)
             {}
 
         public:
             auto& mem(void) { return memory; }
             int join(void);
             void set_pc(uint64_t pc) { vm.regs.rip = pc; }
+            void set_phdr(uint64_t phdr) { vm.phdr = phdr; }
+            void set_phent(uint64_t phent) { vm.phent = phent; }
+            void done_with_init(void) {
+                vm.done_with_init();
+                vm.wait_for_state(kvm::thread_state::READY);
+            }
         };
     }
 }

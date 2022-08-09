@@ -1,5 +1,13 @@
 // SPDX-License-Identifier: GPL-2.0-or-later OR BSD-3-Clause OR Apache-2.0
 
+#ifndef POS_DEBUG_KVM
+#define POS_DEBUG_KVM 1
+#endif
+
+#ifndef POS_DEBUG_SYSCALLS
+#define POS_DEBUG_SYSCALLS 1
+#endif
+
 #include "thread.h++"
 #include <linux/kvm.h>
 #include <sys/ioctl.h>
@@ -31,7 +39,7 @@ using namespace pos::kernel;
 #define CR4_MCE (1U << 6)
 #define CR4_PGE (1U << 7)
 #define CR4_PCE (1U << 8)
-#define CR4_OSFXSR (1U << 8)
+#define CR4_OSFXSR (1U << 9)
 #define CR4_OSXMMEXCPT (1U << 10)
 #define CR4_UMIP (1U << 11)
 #define CR4_VMXE (1U << 13)
@@ -82,9 +90,10 @@ struct gdt_entry_bits {
 void thread::kvm::thread_main(void)
 {
     /*
-     * We're still blocking the constructor at this point so it's not strictly
-     * necessary to hold this lock, but it makes the wakeup logic a bit easier.
+     * Wait to make sure the thread constructor has filled out all the relevant
+     * bits.
      */
+    wait_for_state(thread_state::INIT);
     state_lock.lock();
 
     kvm_fd = open("/dev/kvm", O_RDWR);
@@ -124,7 +133,6 @@ void thread::kvm::thread_main(void)
         return (struct kvm_run *)m;
     }();
 
-    memset(&regs, '\0', sizeof(regs));
     regs.rflags = 2;
 
     auto r = ioctl(cpu_fd, KVM_GET_SREGS, &sregs);
@@ -132,7 +140,7 @@ void thread::kvm::thread_main(void)
 
     sregs.cr0  = CR0_PE | CR0_MP | CR0_ET | CR0_NE | CR0_WP | CR0_AM | CR0_PG;
     sregs.cr3  = memory.ptbr_pa();
-    sregs.cr4  = CR4_PAE;
+    sregs.cr4  = CR4_PAE | CR4_OSFXSR | CR4_OSXMMEXCPT;
     sregs.efer = EFER_LME | EFER_LMA | EFER_SCE;
 
     sregs.cs = [](){
@@ -221,6 +229,61 @@ void thread::kvm::thread_main(void)
     }
 
     /*
+     * Userspace expects that the kernel sets up a stack, so just map one of an
+     * arbitrary size.  The stack grows towards numerically smaller addresses
+     * on x86, so start at the top.  argv, envp, auxv, and the associated
+     * strings are all pushed to the stack before executing the program.
+     */
+    auto stack_va   = 0x30000000;
+    auto stack_size = 0x00010000;
+    memory.map_all(stack_va, stack_size, 1, 1, 1);
+    regs.rsp = stack_va + stack_size - 8;
+
+    {
+        auto balign_up = [](long l, long b) { return (l + b - 1) & ~(b - 1); };
+
+        auto onstack_str = [&](std::string s) {
+            auto length = balign_up(s.length() + 1, 8);
+            regs.rsp -= length;
+            memory.copy_to_va_all(regs.rsp,
+                                  (uint8_t*)(s.c_str()),
+                                  s.length() + 1);
+            return regs.rsp;
+        };
+
+        auto onstack_long = [&](long v) {
+            regs.rsp -= 8;
+            memory.writeq(regs.rsp, v);
+            return regs.rsp;
+        };
+
+        auto onstack_auxv = [&](long type, long val) {
+            onstack_long(val);
+            onstack_long(type);
+        };
+
+        auto onstack_envp = [&](auto addr) { return onstack_long(addr); };
+        auto onstack_argv = [&](auto addr) { return onstack_long(addr); };
+        auto onstack_argc = [&](long argc) { return onstack_long(argc); };
+
+        if (phdr == 0 || phent == 0) {
+            fprintf(stderr, "no PHDR on PHENT\n");
+            abort();
+        }
+
+        auto argv_0 = onstack_str("FIXME_program_name");
+        auto random = onstack_long(4); /* FIXME: not random */
+        onstack_auxv(0, 0);
+        onstack_auxv(25, random); /* AT_RANDOM */
+        onstack_auxv(3, phdr);    /* AT_PHDR   */
+        onstack_auxv(4, phent);   /* AT_PHENT  */
+        onstack_envp(0);
+        onstack_argv(0);
+        onstack_argv(argv_0);
+        onstack_argc(1);
+    }
+
+    /*
      * KVM has been set up, so we can get on with processing commands from the
      * rest of the system.
      */
@@ -240,6 +303,24 @@ void thread::kvm::thread_main(void)
             auto va = regs.rip + i;
             fprintf(stderr, "M[0x%016llx] = 0x%02x\n", va, memory.readb(va));
         }
+
+        fprintf(stderr, "%%rip: 0x%016llx\n", regs.rip);
+        fprintf(stderr, "%%rax: 0x%016llx\n", regs.rax);
+        fprintf(stderr, "%%rcx: 0x%016llx\n", regs.rcx);
+        fprintf(stderr, "%%rdx: 0x%016llx\n", regs.rdx);
+        fprintf(stderr, "%%rbx: 0x%016llx\n", regs.rbx);
+        fprintf(stderr, "%%rsp: 0x%016llx\n", regs.rsp);
+        fprintf(stderr, "%%rbp: 0x%016llx\n", regs.rbp);
+        fprintf(stderr, "%%rsi: 0x%016llx\n", regs.rsi);
+        fprintf(stderr, "%%rdi: 0x%016llx\n", regs.rdi);
+        fprintf(stderr, "%%r8:  0x%016llx\n", regs.r8);
+        fprintf(stderr, "%%r9:  0x%016llx\n", regs.r9);
+        fprintf(stderr, "%%r10: 0x%016llx\n", regs.r10);
+        fprintf(stderr, "%%r11: 0x%016llx\n", regs.r11);
+        fprintf(stderr, "%%r12: 0x%016llx\n", regs.r12);
+        fprintf(stderr, "%%r13: 0x%016llx\n", regs.r13);
+        fprintf(stderr, "%%r14: 0x%016llx\n", regs.r14);
+        fprintf(stderr, "%%r15: 0x%016llx\n", regs.r15);
 #endif
 
         auto r = ioctl(cpu_fd, KVM_SET_REGS, &regs);
@@ -275,8 +356,14 @@ void thread::kvm::thread_main(void)
             break;
 
         case KVM_EXIT_HLT:
-            regs.rax = handle_syscall(regs.rax, regs.rdi);
+        {
+            regs.rax = handle_syscall(regs.rax, regs.rdi, regs.rsi, regs.rdx,
+                                      regs.r10, regs.r8, regs.r9);
+#ifdef POS_DEBUG_SYSCALLS
+            fprintf(stderr, "    ==> 0x%016llx\n", regs.rax);
+#endif
             break;
+        }
 
         default:
             fprintf(stderr, "KVM halted with %d\n", run->exit_reason);
@@ -289,16 +376,152 @@ void thread::kvm::thread_main(void)
     state_lock.unlock();
 }
 
-uint64_t thread::kvm::handle_syscall(uint64_t nr, uint64_t arg0)
+uint64_t thread::kvm::handle_syscall(uint64_t nr, uint64_t arg0,
+                                     uint64_t arg1, uint64_t arg2,
+                                     uint64_t arg3, uint64_t arg4,
+                                     uint64_t arg5)
 {
     switch (nr) {
-    case 60: /* exit() */
+    case 9:   /* mmap */
+    {
+#ifdef POS_DEBUG_SYSCALLS
+        fprintf(stderr, "mmap(0x%016lx, 0x%016lx, ...)\n", arg0, arg1);
+#endif
+
+        /* Unpack "prot", so we can map with the correct permissions. */
+        bool r = !!(arg2 & 0x1);
+        bool w = !!(arg2 & 0x2);
+        bool x = !!(arg2 & 0x4);
+
+        /*
+         * FIXME: We don't support shared file-based writable mappings, so just
+         * stop now to avoid any cleanup.  We'll eventually need to support
+         * these, but for now just return an error -- maybe we'll get lucky and
+         * userspace will tolerate that sort of thing.
+         * */
+        if (w && (arg3 & 0x1) && !(arg3 & 0x20)) {
+            fprintf(stderr, "shared file-based writable mappings aren't supported\n");
+            return -1;
+        }
+
+        /* Mappings with a target VA of NULL should just pick one. */
+        auto va = [&](){
+            if (arg0 == 0) {
+                return memory.alloc_user(arg1, r, w, x);
+            } else {
+                memory.map_all(arg0, arg1, r, w, x);
+                return arg0;
+            }
+        }();
+
+        /* File-backed mappings need to have their initial contents populated. */
+        if (!(arg3 & 0x20)) {
+            auto f = files.nonmutable_ref(arg4);
+            f->seek_absolute(arg5);
+            auto copied = f->read_va_all(memory, va, arg1);
+            if (copied < arg1)
+                memory.zero_va_all(va + copied, arg1 - copied);
+        } else {
+            memory.zero_va_all(va, arg1);
+        }
+
+        return va;
+    }
+
+    case 12: /* brk */
+        /*
+         * Here we're implementing the Linux syscall's behavior, which slightly
+         * differs from the glibc routine: here we must return the new value of
+         * brk(), only updating it when
+         */
+#ifdef POS_DEBUG_SYSCALLS
+        fprintf(stderr, "brk(0x%016lx)\n", arg0);
+#endif
+        return memory.update_brk(arg0);
+
+    case 20:  /* writev */
+    {
+#ifdef POS_DEBUG_SYSCALLS
+        fprintf(stderr, "writev(...)\n", arg0);
+#endif
+
+        auto file = files.mutable_ref(arg0);
+        if (file == nullptr) abort();
+        ssize_t count = 0;
+
+        for (size_t i = 0; i < arg2; ++i) {
+            auto iov_base = memory.readq(arg1 + 16 * i + 0);
+            auto iov_len  = memory.readq(arg1 + 16 * i + 8);
+
+            auto buf = new uint8_t[iov_len];
+            memory.copy_from_va_all(buf, iov_base, iov_len);
+            file->write_all(buf, iov_len);
+            count += iov_len;
+        }
+
+        return count;
+    }
+
+    case 60: /* exit */
+#ifdef POS_DEBUG_SYSCALLS
+        fprintf(stderr, "exit(...)\n", arg0);
+#endif
+
         state = thread_state::DONE;
         state_signal.notify_all();
         return -1;
 
+    case 63:  /* uname */
+#ifdef POS_DEBUG_SYSCALLS
+        fprintf(stderr, "uname(...)\n", arg0);
+#endif
+
+        /*
+         * This is a new_utsname, so it has 6 fields.  glibc checks the kernel
+         * version during startup, so we need to set that.  The rest are set to
+         * something that looks sort of like Linux, just in case.
+         */
+        memory.zero_va_all(arg0, 6*65);
+        memory.strcpy_va(arg0 + 0*65, "Linux");
+        memory.strcpy_va(arg0 + 1*65, "(none)");
+        memory.strcpy_va(arg0 + 2*65, "4.10.0-pos-r0");
+        memory.strcpy_va(arg0 + 3*65, "#1 SMP");
+        memory.strcpy_va(arg0 + 4*65, "x86_64");
+        memory.strcpy_va(arg0 + 5*65, "(none)");
+        return 0;
+
+    /*
+     * All of these are fake, we're just pretending that we're not root and
+     * that nothing special is going on.
+     */
+    case 102: /* getuid */
+    case 104: /* getgid */
+    case 107: /* geteuid */
+    case 108: /* getegid */
+#ifdef POS_DEBUG_SYSCALLS
+        fprintf(stderr, "get*id(...)\n", arg0);
+#endif
+
+        return 1000;
+
+    case 158: /* arch_prctl */
+        switch (arg0) {
+        case 0x1002:
+#ifdef POS_DEBUG_SYSCALLS
+            fprintf(stderr, "arch_prctl(ARCH_SETFS, 0x%016lx)\n", arg1);
+#endif
+            sregs.fs.base = arg1;
+            return 0;
+
+        default:
+            fprintf(stderr, "unknown arch_prctl %lu\n", arg0);
+            abort();
+        }
+        break;
+
     default:
-        fprintf(stderr, "unknown syscall %lx\n", nr);
+        fprintf(stderr, "unknown syscall %lu\n", nr);
+        return -1;
         abort();
     }
 }

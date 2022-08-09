@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <string>
 
 namespace pos {
     namespace kernel {
@@ -28,6 +29,8 @@ namespace pos {
             ha_t backing_store;
             page_state *state;
             pa_t ptbr;
+            va_t brk;
+            va_t user;
 
         public:
             address_space(size_t bytes=128*1024*1024)
@@ -39,7 +42,9 @@ namespace pos {
                                        -1,
                                        0)),
               state(allocate_page_state(pages)),
-              ptbr(palloc())
+              ptbr(palloc()),
+              brk (0x60000000),
+              user(0x70000000)
             {}
 
             ~address_space(void)
@@ -61,11 +66,68 @@ namespace pos {
             ha_t phys2host(pa_t pa) const { return ha_base() + pa - pa_base(); }
             ha_t virt2host(va_t va) const { return phys2host(virt2phys(va)); }
 
-            ssize_t copy_to_va(va_t vaddr, uint8_t *data, size_t bytes);
-            ssize_t zero_va(va_t vaddr, size_t bytes);
+            ssize_t copy_to_va(va_t vaddr, const uint8_t *data, size_t bytes);
+            ssize_t copy_from_va(uint8_t *data, va_t vaddr, size_t bytes);
 
+            bool mapped(va_t va) const;
             uint8_t readb(va_t va) const { return virt2host(va)[0];}
+            uint8_t readq(va_t va) const { return ((uint64_t*)(virt2host(va)))[0];}
             void writeb(va_t va, uint8_t d) { virt2host(va)[0] = d; }
+            void writeq(va_t va, uint64_t d) { ((uint64_t*)(virt2host(va)))[0] = d; }
+
+            void map_all(va_t vaddr, size_t bytes, bool r, bool w, bool x)
+            {
+                while (bytes > 0) {
+                    auto mapped = map(vaddr, bytes, r, w, x);
+                    if (mapped < 0) abort();
+                    vaddr += mapped;
+                    if (bytes < mapped)
+                        break;
+                    bytes -= mapped;
+                }
+            }
+
+            va_t update_brk(va_t new_brk);
+
+            void copy_to_va_all(va_t vaddr, uint8_t *data, size_t bytes)
+            {
+                while (bytes > 0) {
+                    auto copied = copy_to_va(vaddr, data, bytes);
+                    if (copied < 0) abort();
+                    vaddr += copied;
+                    data += copied;
+                    bytes -= copied;
+                }
+            }
+
+            void copy_from_va_all(uint8_t *data, va_t vaddr, size_t bytes)
+            {
+                while (bytes > 0) {
+                    auto copied = copy_from_va(data, vaddr, bytes);
+                    if (copied < 0) abort();
+                    vaddr += copied;
+                    data += copied;
+                    bytes -= copied;
+                }
+            }
+
+            void memset_va_all(va_t vaddr, uint8_t datum, size_t bytes)
+            {
+                for (size_t i = 0; i < bytes; ++i)
+                    writeb(vaddr + i, datum);
+            }
+
+            void zero_va_all(va_t vaddr, size_t bytes)
+            {
+                return memset_va_all(vaddr, 0, bytes);
+            }
+
+            va_t alloc_user(size_t bytes, bool r, bool w, bool x);
+
+            void strcpy_va(va_t vaddr, std::string s)
+            {
+                copy_to_va_all(vaddr, (uint8_t *)(s.c_str()), s.length() + 1);
+            }
 
         private:
             pa_t palloc(void);

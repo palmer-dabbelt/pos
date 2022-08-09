@@ -87,6 +87,35 @@ address_space::pa_t address_space::virt2phys(va_t vaddr) const
     return ppp + ppo;
 }
 
+bool address_space::mapped(va_t vaddr) const
+{
+    pa_t pml4p = ptbr & ~0xFFF;
+    pa_t pml4o = (vaddr >> 39) & 0x1FF;
+    uint64_t *pml4e = (uint64_t*)phys2host(pml4p + pml4o * 8);
+    if (!(*pml4e & 1))
+        return false;
+
+    pa_t pdpp = *pml4e & ~0xFFF;
+    pa_t pdpo = (vaddr >> 30) & 0x1FF;
+    uint64_t *pdpe = (uint64_t*)phys2host(pdpp + pdpo * 8);
+    if (!(*pdpe & 1))
+        return false;
+
+    pa_t pdp = *pdpe & ~0xFFF;
+    pa_t pdo = (vaddr >> 21) & 0x1FF;
+    uint64_t *pde = (uint64_t*)phys2host(pdp + pdo * 8);
+    if (!(*pde & 1))
+        return false;
+
+    pa_t ptp = *pde & ~0xFFF;
+    pa_t pto = (vaddr >> 12) & 0x1FF;
+    uint64_t *pte = (uint64_t*)phys2host(ptp + pto * 8);
+    if (!(*pte & 1))
+        return false;
+
+    return true;
+}
+
 address_space::pa_t address_space::palloc(void)
 {
     for (size_t i = 0; i < pages; ++i) {
@@ -103,7 +132,7 @@ address_space::pa_t address_space::palloc(void)
     return -1;
 }
 
-ssize_t address_space::copy_to_va(va_t vaddr, uint8_t *data, size_t bytes)
+ssize_t address_space::copy_to_va(va_t vaddr, const uint8_t *data, size_t bytes)
 {
     for (size_t i = 0; i < bytes; ++i) {
         auto ha = virt2host(vaddr + i);
@@ -113,12 +142,13 @@ ssize_t address_space::copy_to_va(va_t vaddr, uint8_t *data, size_t bytes)
     return bytes;
 }
 
-ssize_t address_space::zero_va(va_t vaddr, size_t bytes)
+ssize_t address_space::copy_from_va(uint8_t *data, va_t vaddr, size_t bytes)
 {
     for (size_t i = 0; i < bytes; ++i) {
         auto ha = virt2host(vaddr + i);
-        ha[i] = 0;
+        data[i] = *ha;
     }
+
     return bytes;
 }
 
@@ -127,5 +157,23 @@ struct address_space::page_state *address_space::allocate_page_state(size_t page
     auto out = new page_state[pages];
     for (size_t i = 0; i < pages; ++i)
         out[i].allocated = false;
+    return out;
+}
+
+address_space::va_t address_space::update_brk(va_t new_brk)
+{
+    if (new_brk > brk) {
+        map_all(brk, new_brk - brk, 1, 1, 1);
+        brk = new_brk;
+    }
+
+    return brk;
+}
+
+address_space::va_t address_space::alloc_user(size_t bytes, bool r, bool w, bool x)
+{
+    auto out = user;
+    user += bytes;
+    map_all(out, bytes, r, w, x);
     return out;
 }
