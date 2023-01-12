@@ -55,6 +55,15 @@ using namespace pos::kernel;
 #define EFER_LME (1U <<  8)
 #define EFER_LMA (1U << 10)
 
+#define XCR0_X87        (1U << 0)
+#define XCR0_SSE        (1U << 1)
+#define XCR0_AVX        (1U << 2)
+#define XCR0_BNDREG     (1U << 3)
+#define XCR0_BNDCSR     (1U << 4)
+#define XCR0_OPMASK     (1U << 5)
+#define XCR0_ZMM_HI256  (1U << 6)
+#define XCR0_HI16_ZMM   (1U << 7)
+
 template <int N> struct kvm_msrs_wrapper {
     __u32 nmsrs;
     __u32 pad;
@@ -141,7 +150,7 @@ void thread::kvm::thread_main(void)
 
     sregs.cr0  = CR0_PE | CR0_MP | CR0_ET | CR0_NE | CR0_WP | CR0_AM | CR0_PG;
     sregs.cr3  = memory.ptbr_pa();
-    sregs.cr4  = CR4_PAE | CR4_OSFXSR | CR4_OSXMMEXCPT;
+    sregs.cr4  = CR4_PAE | CR4_OSFXSR | CR4_OSXMMEXCPT | CR4_OSXSAVE;
     sregs.efer = EFER_LME | EFER_LMA | EFER_SCE;
 
     sregs.cs = [](){
@@ -165,6 +174,28 @@ void thread::kvm::thread_main(void)
         s.selector = 4 << 3;
         return s;
     }();
+
+    r = ioctl(cpu_fd, KVM_SET_SREGS, &sregs);
+    if (r < 0) abort();
+
+    if (ioctl(kvm_fd, KVM_CAP_XCRS)) {
+        struct kvm_xcrs xcrs;
+
+        xcrs.nr_xcrs = 1;
+        xcrs.flags = 0;
+        xcrs.xcrs[0].xcr = 0;
+        xcrs.xcrs[0].xcr = XCR0_X87 | XCR0_SSE | XCR0_AVX | XCR0_OPMASK | XCR0_ZMM_HI256 | XCR0_HI16_ZMM;
+
+        r = ioctl(cpu_fd, KVM_SET_XCRS, &xcrs);
+        if (r < 0) {
+            perror("Unable to SET_XCRS");
+            int xcr0;
+            __asm__ volatile ("xgetbv" : "=a" (xcr0) : "c" (0) : "%edx");
+            fprintf(stderr, "XCR0: 0x%08x\n", xcr0);
+            abort();
+        }
+    } else
+        abort();
 
     /*
      * In order to handle SYSCALL we need a GDT, because
@@ -383,6 +414,14 @@ void thread::kvm::thread_main(void)
 #ifdef POS_DEBUG_SYSCALLS
             fprintf(stderr, "    ==> 0x%016llx\n", regs.rax);
 #endif
+            break;
+        }
+
+        case KVM_EXIT_FAIL_ENTRY:
+        {
+            fprintf(stderr, "KVM_EXIT_FAIL_ENTRY: hw=0x%016llx\n",
+                    run->fail_entry.hardware_entry_failure_reason);
+            abort();
             break;
         }
 
