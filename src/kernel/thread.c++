@@ -10,6 +10,7 @@
 
 #include "thread.h++"
 #include <linux/kvm.h>
+#include <sys/auxv.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <sys/types.h>
@@ -229,6 +230,18 @@ void thread::kvm::thread_main(void)
     }
 
     /*
+     * Just copy Linux's VDSO over to the guest.  This is obviously garbage, I
+     * just want something here so I can at least get a properly formatted SO.
+     */
+    auto vdso_va = 0x40000000;
+    auto vdso_size = 0x5000;
+    memory.map_all(vdso_va, vdso_size, 1, 1, 1);
+#if 0
+    for (size_t i = 0; i < vdso_size; ++i)
+        memory.writeb(vdso_va + i, ((char*)getauxval(AT_SYSINFO_EHDR))[i]);
+#endif
+
+    /*
      * Userspace expects that the kernel sets up a stack, so just map one of an
      * arbitrary size.  The stack grows towards numerically smaller addresses
      * on x86, so start at the top.  argv, envp, auxv, and the associated
@@ -274,9 +287,17 @@ void thread::kvm::thread_main(void)
         auto argv_0 = onstack_str("FIXME_program_name");
         auto random = onstack_long(4); /* FIXME: not random */
         onstack_auxv(0, 0);
-        onstack_auxv(25, random); /* AT_RANDOM */
-        onstack_auxv(3, phdr);    /* AT_PHDR   */
-        onstack_auxv(4, phent);   /* AT_PHENT  */
+        onstack_auxv(3, phdr);     /* AT_PHDR   */
+        onstack_auxv(4, phent);    /* AT_PHENT  */
+        onstack_auxv(6, 4096);     /* AT_PAGESZ */
+        onstack_auxv(16, 0);       /* AT_HWCAP */
+        onstack_auxv(17, 0x64);    /* AT_CLKTCK */
+        onstack_auxv(18, 0);       /* AT_FPUCW */
+        onstack_auxv(23, 0);       /* AT_SECURE */
+        onstack_auxv(25, random);  /* AT_RANDOM */
+        onstack_auxv(26, 0);       /* AT_HWCAP2 */
+        onstack_auxv(33, vdso_va); /* AT_SYSINFO_EHDR */
+        onstack_auxv(51, 0);       /* AT_MINSIGSTKSZ */
         onstack_envp(0);
         onstack_argv(0);
         onstack_argv(argv_0);

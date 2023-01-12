@@ -38,4 +38,19 @@ check_nanotls_false_SOURCES = test/nanotls_false.c test/nanotls_false-testval.c
 check_nanotls_false_CFLAGS  = -static -nostdlib -ffreestanding -O3 -fpie
 XFAIL_TESTS += test/pos/nanotls_false.bash
 
+check_PROGRAMS += check-static_true
+check_static_true_SOURCES = test/true.c
+check_static_true_CFLAGS  = -static
+TESTS += test/pos/static_true.bash
+
+check_PROGRAMS += check-static_uname
+check_static_uname_SOURCES = test/uname.c
+check_static_uname_CFLAGS  = -static
+TESTS += test/pos/static_uname.bash
+
+check_PROGRAMS += check-static_auxv
+check_static_auxv_SOURCES = test/auxv.c
+check_static_auxv_CFLAGS  = -static
+TESTS += test/pos/static_auxv.bash
+
 TESTS += $(XFAIL_TESTS)

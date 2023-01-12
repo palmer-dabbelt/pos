@@ -42,7 +42,7 @@ namespace pos {
             public:
                 struct kvm_regs regs;
                 struct kvm_sregs sregs;
-                uint64_t phdr, phent;
+                uint64_t phdr, phent, vdso;
 
             public:
                 kvm(address_space& _memory, decltype(files)& _files)
