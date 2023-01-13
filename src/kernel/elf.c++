@@ -79,6 +79,10 @@ bool elf::load(address_space& mem, uint64_t& entry, uint64_t& phdr_out,
             break;
         }
 
+        case PT_DYNAMIC:
+            abort();
+            break;
+
         case PT_INTERP:
             abort();
             break;
