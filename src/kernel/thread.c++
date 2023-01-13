@@ -336,6 +336,14 @@ void thread::kvm::thread_main(void)
     }
 
     /*
+     * Userspace also expects that RDX contains the atexit() pointer, which is
+     * a special magic argument that plums in through the dynamic linker.  I
+     * found this mentioned in glibc's start.S, but I can't find it in the ABI
+     * doc.
+     */
+    regs.rdx = 0;
+
+    /*
      * KVM has been set up, so we can get on with processing commands from the
      * rest of the system.
      */
