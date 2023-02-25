@@ -184,7 +184,7 @@ void thread::kvm::thread_main(void)
         xcrs.nr_xcrs = 1;
         xcrs.flags = 0;
         xcrs.xcrs[0].xcr = 0;
-        xcrs.xcrs[0].xcr = XCR0_X87 | XCR0_SSE | XCR0_AVX | XCR0_OPMASK | XCR0_ZMM_HI256 | XCR0_HI16_ZMM;
+        xcrs.xcrs[0].value = XCR0_X87 | XCR0_SSE | XCR0_AVX | XCR0_OPMASK | XCR0_ZMM_HI256 | XCR0_HI16_ZMM;
 
         r = ioctl(cpu_fd, KVM_SET_XCRS, &xcrs);
         if (r < 0) {
