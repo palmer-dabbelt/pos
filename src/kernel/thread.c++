@@ -329,11 +329,12 @@ void thread::kvm::thread_main(void)
         onstack_auxv(13, 0);       /* AT_GID */
         onstack_auxv(14, 0);       /* AT_EGID */
         onstack_auxv(15, platform);
+        onstack_auxv(16, 0x6);     /* AT_HWCAP */
         onstack_auxv(17, 0x64);    /* AT_CLKTCK */
         onstack_auxv(18, 0);       /* AT_FPUCW */
         onstack_auxv(23, 0);       /* AT_SECURE */
         onstack_auxv(25, random);  /* AT_RANDOM */
-        onstack_auxv(26, 0);       /* AT_HWCAP2 */
+        onstack_auxv(26, 0x2);     /* AT_HWCAP2 */
         onstack_auxv(33, vdso_va); /* AT_SYSINFO_EHDR */
         onstack_auxv(51, 0);       /* AT_MINSIGSTKSZ */
         onstack_envp(0);
