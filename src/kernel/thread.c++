@@ -323,6 +323,10 @@ void thread::kvm::thread_main(void)
         onstack_auxv(5, phnum);    /* AT_PHNUM */
         onstack_auxv(6, 4096);     /* AT_PAGESZ */
         onstack_auxv(9, regs.rip); /* AT_ENTRY */
+        onstack_auxv(11, 0);       /* AT_UID */
+        onstack_auxv(12, 0);       /* AT_EUID */
+        onstack_auxv(13, 0);       /* AT_GID */
+        onstack_auxv(14, 0);       /* AT_EGID */
         onstack_auxv(17, 0x64);    /* AT_CLKTCK */
         onstack_auxv(18, 0);       /* AT_FPUCW */
         onstack_auxv(23, 0);       /* AT_SECURE */
