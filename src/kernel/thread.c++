@@ -318,8 +318,9 @@ void thread::kvm::thread_main(void)
         auto argv_0 = onstack_str("FIXME_program_name");
         auto random = onstack_long(4); /* FIXME: not random */
         onstack_auxv(0, 0);
-        onstack_auxv(3, phdr);     /* AT_PHDR   */
-        onstack_auxv(4, phent);    /* AT_PHENT  */
+        onstack_auxv(3, phdr);     /* AT_PHDR */
+        onstack_auxv(4, phent);    /* AT_PHENT */
+        onstack_auxv(5, phnum);    /* AT_PHNUM */
         onstack_auxv(6, 4096);     /* AT_PAGESZ */
         onstack_auxv(16, 0);       /* AT_HWCAP */
         onstack_auxv(17, 0x64);    /* AT_CLKTCK */

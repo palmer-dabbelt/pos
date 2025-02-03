@@ -15,17 +15,19 @@ std::shared_ptr<thread> elf::create_init_thread(void) const
     uint64_t entry;
     uint64_t phdr;
     uint64_t phent;
-    if (!load(t->mem(), entry, phdr, phent))
+    uint64_t phnum;
+    if (!load(t->mem(), entry, phdr, phent, phnum))
         abort();
     t->set_pc(entry);
     t->set_phdr(phdr);
     t->set_phent(phent);
+    t->set_phnum(phnum);
     t->done_with_init();
     return t;
 }
 
 bool elf::load(address_space& mem, uint64_t& entry, uint64_t& phdr_out,
-               uint64_t& phent, size_t offset) const
+               uint64_t& phent, uint64_t& phnum, size_t offset) const
 {
     auto fd = open(path.c_str(), O_RDONLY);
     if (fd <= 0) {
@@ -95,7 +97,8 @@ bool elf::load(address_space& mem, uint64_t& entry, uint64_t& phdr_out,
      * __ehdr_start), but I can't figure out what to do with that (do I just
      * map the GNU property sections?).
      */
-    phent = ehdr->e_phnum;
+    phent = sizeof(Elf64_Phdr);
+    phnum = ehdr->e_phnum;
     phdr_out = mem.alloc_user(phent * sizeof(Elf64_Phdr), 1, 0, 0);
     mem.copy_to_va_all(phdr_out, base + ehdr->e_phoff, phent * sizeof(Elf64_Phdr));
 
