@@ -322,7 +322,7 @@ void thread::kvm::thread_main(void)
         onstack_auxv(4, phent);    /* AT_PHENT */
         onstack_auxv(5, phnum);    /* AT_PHNUM */
         onstack_auxv(6, 4096);     /* AT_PAGESZ */
-        onstack_auxv(16, 0);       /* AT_HWCAP */
+        onstack_auxv(9, regs.rip); /* AT_ENTRY */
         onstack_auxv(17, 0x64);    /* AT_CLKTCK */
         onstack_auxv(18, 0);       /* AT_FPUCW */
         onstack_auxv(23, 0);       /* AT_SECURE */
