@@ -334,6 +334,7 @@ void thread::kvm::thread_main(void)
         onstack_auxv(23, 0);       /* AT_SECURE */
         onstack_auxv(25, random);  /* AT_RANDOM */
         onstack_auxv(26, 0x2);     /* AT_HWCAP2 */
+        onstack_auxv(31, argv_0);  /* AT_EXECFN */
         onstack_auxv(33, vdso_va); /* AT_SYSINFO_EHDR */
         onstack_auxv(51, 0);       /* AT_MINSIGSTKSZ */
         onstack_envp(0);
