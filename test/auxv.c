@@ -4,6 +4,7 @@
 int main() {
     printf("AT_PAGESZ:       0x%016lx\n", getauxval(AT_PAGESZ));
     printf("AT_SECURE:       0x%016lx\n", getauxval(AT_SECURE));
+    printf("AT_PLATFORM:     %s\n", (const char *)(getauxval(AT_PLATFORM)));
     printf("AT_HWCAP:        0x%016lx\n", getauxval(AT_HWCAP));
     printf("AT_HWCAP2:       0x%016lx\n", getauxval(AT_HWCAP2));
     printf("AT_CLKTCK:       0x%016lx\n", getauxval(AT_CLKTCK));
