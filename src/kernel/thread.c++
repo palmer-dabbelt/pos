@@ -5,7 +5,7 @@
 #endif
 
 #ifndef POS_DEBUG_SYSCALLS
-#define POS_DEBUG_SYSCALLS 1
+#define POS_DEBUG_SYSCALLS 0
 #endif
 
 #include "thread.h++"
@@ -426,7 +426,7 @@ void thread::kvm::thread_main(void)
         {
             regs.rax = handle_syscall(regs.rax, regs.rdi, regs.rsi, regs.rdx,
                                       regs.r10, regs.r8, regs.r9);
-#ifdef POS_DEBUG_SYSCALLS
+#if POS_DEBUG_SYSCALLS
             fprintf(stderr, "    ==> 0x%016llx\n", regs.rax);
 #endif
             break;
@@ -472,7 +472,7 @@ uint64_t thread::kvm::handle_syscall(uint64_t nr, uint64_t arg0,
 
     case 9:   /* mmap */
     {
-#ifdef POS_DEBUG_SYSCALLS
+#if POS_DEBUG_SYSCALLS
         fprintf(stderr, "mmap(0x%016lx, 0x%016lx, ...)\n", arg0, arg1);
 #endif
 
@@ -516,20 +516,24 @@ uint64_t thread::kvm::handle_syscall(uint64_t nr, uint64_t arg0,
         return va;
     }
 
+    case 10: /* mprotect */
+        fprintf(stderr, "UNIMPLEMENTED syscall 10 (mprotect)\n");
+        return 0;
+
     case 12: /* brk */
         /*
          * Here we're implementing the Linux syscall's behavior, which slightly
          * differs from the glibc routine: here we must return the new value of
          * brk(), only updating it when
          */
-#ifdef POS_DEBUG_SYSCALLS
+#if POS_DEBUG_SYSCALLS
         fprintf(stderr, "brk(0x%016lx)\n", arg0);
 #endif
         return memory.update_brk(arg0);
 
     case 20:  /* writev */
     {
-#ifdef POS_DEBUG_SYSCALLS
+#if POS_DEBUG_SYSCALLS
         fprintf(stderr, "writev(...)\n", arg0);
 #endif
 
@@ -553,7 +557,7 @@ uint64_t thread::kvm::handle_syscall(uint64_t nr, uint64_t arg0,
 
     case 60: /* exit */
     case 231: /* exit_group */
-#ifdef POS_DEBUG_SYSCALLS
+#if POS_DEBUG_SYSCALLS
         fprintf(stderr, "exit(%ld)\n", arg0);
 #endif
 
@@ -562,7 +566,7 @@ uint64_t thread::kvm::handle_syscall(uint64_t nr, uint64_t arg0,
         return -1;
 
     case 63:  /* uname */
-#ifdef POS_DEBUG_SYSCALLS
+#if POS_DEBUG_SYSCALLS
         fprintf(stderr, "uname(...)\n", arg0);
 #endif
 
@@ -588,7 +592,7 @@ uint64_t thread::kvm::handle_syscall(uint64_t nr, uint64_t arg0,
     case 104: /* getgid */
     case 107: /* geteuid */
     case 108: /* getegid */
-#ifdef POS_DEBUG_SYSCALLS
+#if POS_DEBUG_SYSCALLS
         fprintf(stderr, "get*id(...)\n", arg0);
 #endif
 
@@ -597,7 +601,7 @@ uint64_t thread::kvm::handle_syscall(uint64_t nr, uint64_t arg0,
     case 158: /* arch_prctl */
         switch (arg0) {
         case 0x1002:
-#ifdef POS_DEBUG_SYSCALLS
+#if POS_DEBUG_SYSCALLS
             fprintf(stderr, "arch_prctl(ARCH_SETFS, 0x%016lx)\n", arg1);
 #endif
             sregs.fs.base = arg1;

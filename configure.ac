@@ -20,5 +20,11 @@ AC_ARG_ENABLE(
 	[CXXFLAGS="$CXXFLAGS -DPOS_DEBUG_KVM=1"]
 )
 
+AC_ARG_ENABLE(
+	debug-syscalls,
+	[--enable-debug-syscalls	Print a syscall log],
+	[CXXFLAGS="$CXXFLAGS -DPOS_DEBUG_SYSCALLS=1"]
+)
+
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT
