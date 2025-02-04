@@ -14,5 +14,11 @@ AC_ARG_ENABLE(
 	[CXXFLAGS="$CXXFLAGS -fsanitize=address -g -Og -fno-omit-frame-pointer -rdynamic"]
 )
 
+AC_ARG_ENABLE(
+	debug-kvm,
+	[--enable-debug-kvm		Print a KVM instruction log],
+	[CXXFLAGS="$CXXFLAGS -DPOS_DEBUG_KVM=1"]
+)
+
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT
