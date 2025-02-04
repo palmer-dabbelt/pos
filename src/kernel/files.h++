@@ -86,7 +86,10 @@ namespace pos {
             }
 
             std::shared_ptr<file> nonmutable_ref(int fd) {
-                return mutable_ref(fd)->dup();
+                auto ref = mutable_ref(fd);
+                if (ref == nullptr)
+                    abort();
+                return ref->dup();
             }
 
         private:
