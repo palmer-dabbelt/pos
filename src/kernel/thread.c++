@@ -545,14 +545,16 @@ uint64_t thread::kvm::handle_syscall(uint64_t nr, uint64_t arg0,
             memory.copy_from_va_all(buf, iov_base, iov_len);
             file->write_all(buf, iov_len);
             count += iov_len;
+            delete[] buf;
         }
 
         return count;
     }
 
     case 60: /* exit */
+    case 231: /* exit_group */
 #ifdef POS_DEBUG_SYSCALLS
-        fprintf(stderr, "exit(...)\n", arg0);
+        fprintf(stderr, "exit(%ld)\n", arg0);
 #endif
 
         state = thread_state::DONE;
