@@ -192,7 +192,6 @@ void thread::kvm::thread_main(void)
             int xcr0;
             __asm__ volatile ("xgetbv" : "=a" (xcr0) : "c" (0) : "%edx");
             fprintf(stderr, "XCR0: 0x%08x\n", xcr0);
-            abort();
         }
     } else
         abort();
