@@ -458,6 +458,19 @@ uint64_t thread::kvm::handle_syscall(uint64_t nr, uint64_t arg0,
                                      uint64_t arg5)
 {
     switch (nr) {
+    case 1: /* write */
+    {
+        auto file = files.mutable_ref(arg0);
+        if (file == nullptr) abort();
+
+        auto buf = new uint8_t[arg2];
+        memory.copy_from_va_all(buf, arg1, arg2);
+        file->write_all(buf, arg2);
+        delete[] buf;
+
+        return arg2;
+    }
+
     case 9:   /* mmap */
     {
 #ifdef POS_DEBUG_SYSCALLS
