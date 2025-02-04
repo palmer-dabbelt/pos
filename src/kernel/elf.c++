@@ -53,6 +53,12 @@ bool elf::load(address_space& mem, uint64_t& entry, uint64_t& phdr_out,
 
     for (size_t i = 0; i < ehdr->e_phnum; ++i) {
         Elf64_Phdr *phdr = ((Elf64_Phdr *)(base + ehdr->e_phoff)) + i;
+        if ((uint8_t*)phdr - base > statbuf.st_size) {
+            fprintf(stderr, "phdr: 0x%016llx\n", (long long unsigned)phdr);
+            fprintf(stderr, "base: 0x%016llx\n", (long long unsigned)base);
+            fprintf(stderr, "size: 0x%016llx\n", (long long unsigned)statbuf.st_size);
+            abort();
+        }
 
         switch (phdr->p_type) {
         case PT_LOAD:
