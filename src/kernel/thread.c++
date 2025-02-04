@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later OR BSD-3-Clause OR Apache-2.0
 
 #ifndef POS_DEBUG_KVM
-#define POS_DEBUG_KVM 1
+#define POS_DEBUG_KVM 0
 #endif
 
 #ifndef POS_DEBUG_SYSCALLS
