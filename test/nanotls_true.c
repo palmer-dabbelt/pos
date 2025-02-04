@@ -30,9 +30,11 @@ __asm__ (
 "    syscall\n"
 
 /* Actually calls main. */
+"call_main:\n"
 "    call main\n"
 
 /* exit()s with the value returned from main. */
+"call_exit:\n"
 "    mov %rax, %rdi\n"
 "    mov  $60, %rax\n"
 "    syscall\n"
