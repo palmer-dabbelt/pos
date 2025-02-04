@@ -1,1 +1,5 @@
-nano_true.bash
+#!/bin/bash
+
+set -ex
+
+${srcdir}/pos -- check-static_auxv
