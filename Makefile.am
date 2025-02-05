@@ -53,4 +53,16 @@ check_static_auxv_SOURCES = test/auxv.c
 check_static_auxv_CFLAGS  = -static
 TESTS += test/pos/static_auxv.bash
 
+check_PROGRAMS += check-true
+check_true_SOURCES = test/true.c
+TESTS += test/pos/true.bash
+
+check_PROGRAMS += check-uname
+check_uname_SOURCES = test/uname.c
+TESTS += test/pos/uname.bash
+
+check_PROGRAMS += check-auxv
+check_auxv_SOURCES = test/auxv.c
+TESTS += test/pos/auxv.bash
+
 TESTS += $(XFAIL_TESTS)
