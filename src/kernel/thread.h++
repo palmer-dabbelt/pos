@@ -43,6 +43,8 @@ namespace pos {
                 struct kvm_regs regs;
                 struct kvm_sregs sregs;
                 uint64_t phdr, phent, phnum, vdso;
+                int argc;
+                char **argv;
 
             public:
                 kvm(address_space& _memory, decltype(files)& _files)
@@ -114,10 +116,14 @@ namespace pos {
         public:
             auto& mem(void) { return memory; }
             int join(void);
+
             void set_pc(uint64_t pc) { vm.regs.rip = pc; }
             void set_phdr(uint64_t phdr) { vm.phdr = phdr; }
             void set_phent(uint64_t phent) { vm.phent = phent; }
             void set_phnum(uint64_t phnum) { vm.phnum = phnum; }
+            void set_argc(int val) { vm.argc = val; }
+            void set_argv(char **val) { vm.argv = val; }
+
             void done_with_init(void) {
                 vm.done_with_init();
                 vm.wait_for_state(kvm::thread_state::READY);

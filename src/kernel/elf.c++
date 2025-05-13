@@ -10,9 +10,10 @@
 #include <cstring>
 using namespace pos::kernel;
 
-std::shared_ptr<thread> elf::create_init_thread(void) const
+std::shared_ptr<thread> elf::create_init_thread(int argc, char **argv) const
 {
     auto t = std::make_shared<thread>();
+
     uint64_t entry;
     uint64_t phdr;
     uint64_t phent;
@@ -23,6 +24,10 @@ std::shared_ptr<thread> elf::create_init_thread(void) const
     t->set_phdr(phdr);
     t->set_phent(phent);
     t->set_phnum(phnum);
+
+    t->set_argc(argc);
+    t->set_argv(argv);
+
     t->done_with_init();
     return t;
 }

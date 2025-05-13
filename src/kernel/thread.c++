@@ -314,33 +314,41 @@ void thread::kvm::thread_main(void)
             abort();
         }
 
-        auto argv_0 = onstack_str("FIXME_program_name");
+        long argv_va[argc];
+        for (int i = 0; i < argc; ++i)
+            argv_va[i] = onstack_str(argv[i]);
+
         auto random = onstack_long(4); /* FIXME: not random */
         auto platform = onstack_str("x86_64");
+
         onstack_auxv(0, 0);
-        onstack_auxv(3, phdr);     /* AT_PHDR */
-        onstack_auxv(4, phent);    /* AT_PHENT */
-        onstack_auxv(5, phnum);    /* AT_PHNUM */
-        onstack_auxv(6, 4096);     /* AT_PAGESZ */
-        onstack_auxv(9, regs.rip); /* AT_ENTRY */
-        onstack_auxv(11, 0);       /* AT_UID */
-        onstack_auxv(12, 0);       /* AT_EUID */
-        onstack_auxv(13, 0);       /* AT_GID */
-        onstack_auxv(14, 0);       /* AT_EGID */
-        onstack_auxv(15, platform);/* AT_PLATFORM */
-        onstack_auxv(16, 0x6);     /* AT_HWCAP */
-        onstack_auxv(17, 0x64);    /* AT_CLKTCK */
-        onstack_auxv(18, 0);       /* AT_FPUCW */
-        onstack_auxv(23, 0);       /* AT_SECURE */
-        onstack_auxv(25, random);  /* AT_RANDOM */
-        onstack_auxv(26, 0x2);     /* AT_HWCAP2 */
-        onstack_auxv(31, argv_0);  /* AT_EXECFN */
-        onstack_auxv(33, vdso_va); /* AT_SYSINFO_EHDR */
-        onstack_auxv(51, 0);       /* AT_MINSIGSTKSZ */
+        onstack_auxv(3, phdr);        /* AT_PHDR */
+        onstack_auxv(4, phent);       /* AT_PHENT */
+        onstack_auxv(5, phnum);       /* AT_PHNUM */
+        onstack_auxv(6, 4096);        /* AT_PAGESZ */
+        onstack_auxv(9, regs.rip);    /* AT_ENTRY */
+        onstack_auxv(11, 0);          /* AT_UID */
+        onstack_auxv(12, 0);          /* AT_EUID */
+        onstack_auxv(13, 0);          /* AT_GID */
+        onstack_auxv(14, 0);          /* AT_EGID */
+        onstack_auxv(15, platform);   /* AT_PLATFORM */
+        onstack_auxv(16, 0x6);        /* AT_HWCAP */
+        onstack_auxv(17, 0x64);       /* AT_CLKTCK */
+        onstack_auxv(18, 0);          /* AT_FPUCW */
+        onstack_auxv(23, 0);          /* AT_SECURE */
+        onstack_auxv(25, random);     /* AT_RANDOM */
+        onstack_auxv(26, 0x2);        /* AT_HWCAP2 */
+        onstack_auxv(31, argv_va[0]); /* AT_EXECFN */
+        onstack_auxv(33, vdso_va);    /* AT_SYSINFO_EHDR */
+        onstack_auxv(51, 0);          /* AT_MINSIGSTKSZ */
+
         onstack_envp(0);
+
         onstack_argv(0);
-        onstack_argv(argv_0);
-        onstack_argc(1);
+        for (int i = argc-1; i >= 0; --i)
+            onstack_argv(argv_va[i]);
+
+        onstack_argc(argc);
     }
 
     /*

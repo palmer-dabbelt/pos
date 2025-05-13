@@ -23,7 +23,7 @@ namespace pos {
 
             bool load(address_space& mem, uint64_t& entry, uint64_t& phdr,
                       uint64_t& phent, uint64_t& phnum, size_t offset=0) const;
-            std::shared_ptr<thread> create_init_thread(void) const;
+            std::shared_ptr<thread> create_init_thread(int argc, char **argv) const;
 
         public:
             /*
