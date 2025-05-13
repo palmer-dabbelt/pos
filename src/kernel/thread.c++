@@ -294,6 +294,11 @@ void thread::kvm::thread_main(void)
             return regs.rsp;
         };
 
+        auto stack_align = [&](long bytes) {
+           regs.rsp += bytes - (regs.rsp % bytes);
+           fprintf(stderr, "0x%016llx\n", regs.rsp);
+        };
+
         auto onstack_long = [&](long v) {
             regs.rsp -= 8;
             memory.writeq(regs.rsp, v);
@@ -320,6 +325,10 @@ void thread::kvm::thread_main(void)
 
         auto random = onstack_long(4); /* FIXME: not random */
         auto platform = onstack_str("x86_64");
+
+        stack_align(16);
+        if (argc % 2 == 0)
+            onstack_long(0);
 
         onstack_auxv(0, 0);
         onstack_auxv(3, phdr);        /* AT_PHDR */

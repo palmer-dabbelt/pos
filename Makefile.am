@@ -71,4 +71,6 @@ check_PROGRAMS += check-auxv
 check_auxv_SOURCES = test/auxv.c
 TESTS += test/pos/auxv.bash
 
+TESTS += test/pos/ld-linux.bash
+
 TESTS += $(XFAIL_TESTS)
