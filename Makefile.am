@@ -53,6 +53,12 @@ check_static_auxv_SOURCES = test/auxv.c
 check_static_auxv_CFLAGS  = -static
 TESTS += test/pos/static_auxv.bash
 
+check_PROGRAMS += check-static_argv
+check_static_argv_SOURCES = test/argv.c
+check_static_argv_CFLAGS  = -static
+TESTS += test/pos/static_argv_0.bash
+TESTS += test/pos/static_argv_1.bash
+
 check_PROGRAMS += check-true
 check_true_SOURCES = test/true.c
 TESTS += test/pos/true.bash
