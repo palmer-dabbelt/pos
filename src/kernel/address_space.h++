@@ -71,7 +71,7 @@ namespace pos {
 
             bool mapped(va_t va) const;
             uint8_t readb(va_t va) const { return virt2host(va)[0];}
-            uint8_t readq(va_t va) const { return ((uint64_t*)(virt2host(va)))[0];}
+            uint64_t readq(va_t va) const { return ((uint64_t*)(virt2host(va)))[0];}
             void writeb(va_t va, uint8_t d) { virt2host(va)[0] = d; }
             void writeq(va_t va, uint64_t d) { ((uint64_t*)(virt2host(va)))[0] = d; }
 
