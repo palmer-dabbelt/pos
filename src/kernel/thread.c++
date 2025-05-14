@@ -475,6 +475,21 @@ uint64_t thread::kvm::handle_syscall(uint64_t nr, uint64_t arg0,
                                      uint64_t arg5)
 {
     switch (nr) {
+    case 0: /* read */
+    {
+#ifdef POS_DEBUG_SYSCALLS
+        fprintf(stderr, "read(%d, ...)\n", (int)arg0);
+#endif
+        auto file = files.mutable_ref(arg0);
+
+        auto buf = new uint8_t[arg2];
+        auto count = file->read(buf, arg2);
+        memory.copy_to_va_all(arg1, buf, count);
+        delete[] buf;
+
+        return count;
+    }
+
     case 1: /* write */
     {
         auto file = files.mutable_ref(arg0);
