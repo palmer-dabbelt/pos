@@ -7,7 +7,23 @@ using namespace pos::kernel;
 
 ssize_t file::read_va_all(address_space& mem, address_space::va_t va, size_t bytes)
 {
-    abort();
+    uint8_t buf[4096];
+    size_t total = 0;
+    while (bytes > 0) {
+        auto readed = read(buf, std::min(bytes, sizeof(buf)));
+        if (readed == 0)
+            return total;
+        if (readed < 0) {
+            perror("unable to read file");
+            abort();
+        }
+
+        mem.copy_to_va_all(va, buf, readed);
+        bytes -= readed;
+        va += readed;
+        total += readed;
+    }
+    return total;
 }
 
 ssize_t local_file::read(uint8_t *buf, size_t len)

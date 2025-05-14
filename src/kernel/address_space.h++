@@ -100,6 +100,11 @@ namespace pos {
                 }
             }
 
+            void copy_to_va_all(va_t vaddr, char *data, size_t bytes)
+            {
+                return copy_to_va_all(vaddr, (uint8_t*)data, bytes);
+            }
+
             void copy_from_va_all(uint8_t *data, va_t vaddr, size_t bytes)
             {
                 while (bytes > 0) {
