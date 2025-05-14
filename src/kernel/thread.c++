@@ -319,6 +319,7 @@ void thread::kvm::thread_main(void)
             abort();
         }
 
+        long argc = argv.size();
         long argv_va[argc];
         for (int i = 0; i < argc; ++i)
             argv_va[i] = onstack_str(argv[i]);

@@ -10,7 +10,16 @@
 #include <cstring>
 using namespace pos::kernel;
 
-std::shared_ptr<thread> elf::create_init_thread(int argc, char **argv) const
+template <typename T>
+std::vector<T> operator+(const std::vector<T>& a, const std::vector<T>& b)
+{
+    std::vector<T> out;
+    for (const auto& e: a) out.push_back(e);
+    for (const auto& e: b) out.push_back(e);
+    return out;
+}
+
+std::shared_ptr<thread> elf::create_init_thread(const std::vector<std::string>& argv)
 {
     auto t = std::make_shared<thread>();
 
@@ -25,15 +34,14 @@ std::shared_ptr<thread> elf::create_init_thread(int argc, char **argv) const
     t->set_phent(phent);
     t->set_phnum(phnum);
 
-    t->set_argc(argc);
-    t->set_argv(argv);
+    t->set_argv(argv_prefix + argv);
 
     t->done_with_init();
     return t;
 }
 
 bool elf::load(address_space& mem, uint64_t& entry, uint64_t& phdr_out,
-               uint64_t& phent, uint64_t& phnum, size_t offset) const
+               uint64_t& phent, uint64_t& phnum, size_t offset)
 {
     auto fd = open(path.c_str(), O_RDONLY);
     if (fd <= 0) {
@@ -81,9 +89,10 @@ bool elf::load(address_space& mem, uint64_t& entry, uint64_t& phdr_out,
                 auto interp_path = std::string(buf);
 
                 auto interp = elf(interp_path);
-                fprintf(stderr, "loading %s\n", interp_path.c_str());
                 interp.load(mem, entry, phdr_out, phent, phnum, offset);
-                fprintf(stderr, "done loading %s\n", interp_path.c_str());
+
+                argv_prefix.push_back(interp_path);
+
                 return true;
             }
         }

@@ -37,11 +37,10 @@ int main(int argc, char **argv)
     auto elf = pos::kernel::elf::load(argv[command_offset.value()]);
 
     int child_argc = argc - command_offset.value();
-    char *child_argv[child_argc + 1];
+    std::vector<std::string> child_argv(child_argc);
     for (int i = 0; i < child_argc; ++i)
         child_argv[i] = argv[i + command_offset.value()];
-    child_argv[child_argc] = NULL;
 
-    auto thread = elf->create_init_thread(child_argc, child_argv);
+    auto thread = elf->create_init_thread(child_argv);
     return thread->join();
 }

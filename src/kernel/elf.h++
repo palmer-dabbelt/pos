@@ -5,6 +5,7 @@
 
 #include "thread.h++"
 #include <memory>
+#include <vector>
 
 namespace pos {
     namespace kernel {
@@ -15,6 +16,7 @@ namespace pos {
         class elf {
         private:
             const std::string path;
+            std::vector<std::string> argv_prefix;
 
         public:
             elf(const std::string& path_)
@@ -22,8 +24,8 @@ namespace pos {
             {}
 
             bool load(address_space& mem, uint64_t& entry, uint64_t& phdr,
-                      uint64_t& phent, uint64_t& phnum, size_t offset=0) const;
-            std::shared_ptr<thread> create_init_thread(int argc, char **argv) const;
+                      uint64_t& phent, uint64_t& phnum, size_t offset=0);
+            std::shared_ptr<thread> create_init_thread(const std::vector<std::string>& argv);
 
         public:
             /*
