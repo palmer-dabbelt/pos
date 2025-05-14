@@ -617,6 +617,23 @@ uint64_t thread::kvm::handle_syscall(uint64_t nr, uint64_t arg0,
         memory.strcpy_va(arg0 + 5*65, "(none)");
         return 0;
 
+    case 79: /* getcwd */
+    {
+#ifdef POS_DEBUG_SYSCALLS
+        fprintf(stderr, "getcwd(...)\n");
+#endif
+        auto buf = new char[arg1];
+        getcwd(buf, arg1);
+        memory.copy_to_va_all(arg0, buf, arg1);
+        auto len = strlen(buf);
+        delete[] buf;
+        /*
+         * FIXME: the man pages say this returns the buffer, but strace says it
+         * returns the length.
+         */
+        return len + 1;
+    }
+
     /*
      * All of these are fake, we're just pretending that we're not root and
      * that nothing special is going on.
