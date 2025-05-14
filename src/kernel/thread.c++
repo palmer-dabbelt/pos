@@ -666,6 +666,9 @@ uint64_t thread::kvm::handle_syscall(uint64_t nr, uint64_t arg0,
     case 257: /* openat */
     {
         std::string pathname = memory.va_to_string(arg1);
+#if POS_DEBUG_SYSCALLS
+        fprintf(stderr, "openat(..., %s, ...)\n", pathname.c_str());
+#endif
         if (pathname[0] != '/' && (int)arg0 != AT_FDCWD) abort();
         return files.open_local_by_path(pathname, arg2, arg3)->emulated_fd();
     }
