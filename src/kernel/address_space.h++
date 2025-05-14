@@ -129,6 +129,13 @@ namespace pos {
 
             va_t alloc_user(size_t bytes, bool r, bool w, bool x);
 
+            va_t alloc_user_aligned(size_t bytes, size_t align, bool r, bool w, bool x)
+            {
+                auto va = alloc_user(bytes + align, r, w, x);
+                va += align - va % align;
+                return va;
+            }
+
             void strcpy_va(va_t vaddr, std::string s)
             {
                 copy_to_va_all(vaddr, (uint8_t *)(s.c_str()), s.length() + 1);

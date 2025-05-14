@@ -514,7 +514,7 @@ uint64_t thread::kvm::handle_syscall(uint64_t nr, uint64_t arg0,
         /* Mappings with a target VA of NULL should just pick one. */
         auto va = [&](){
             if (arg0 == 0) {
-                return memory.alloc_user(arg1, r, w, x);
+                return memory.alloc_user_aligned(arg1, 4096, r, w, x);
             } else {
                 memory.map_all(arg0, arg1, r, w, x);
                 return arg0;
