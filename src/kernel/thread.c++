@@ -631,6 +631,13 @@ uint64_t thread::kvm::handle_syscall(uint64_t nr, uint64_t arg0,
         }
         break;
 
+    case 257: /* openat */
+    {
+        std::string pathname = memory.va_to_string(arg1);
+        if (pathname[0] != '/' && (int)arg0 != AT_FDCWD) abort();
+        return files.open_local_by_path(pathname, arg2, arg3)->emulated_fd();
+    }
+
     default:
         fprintf(stderr, "unknown syscall %lu\n", nr);
         return -1;

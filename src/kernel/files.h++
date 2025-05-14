@@ -12,11 +12,20 @@
 
 namespace pos {
     namespace kernel {
+        class files;
+
         /*
          * Any file must conform to this interface.
          */
         class file {
+        protected:
+            int _emulated_fd;
+
         public:
+            file(int emulated_fd)
+            : _emulated_fd(emulated_fd)
+            {}
+
             virtual void write_all(uint8_t *buf, size_t len)
             {
                 while (len > 0) {
@@ -26,6 +35,8 @@ namespace pos {
                     len -= written;
                 }
             }
+
+            int emulated_fd(void) const { return _emulated_fd; }
 
             virtual ssize_t write(uint8_t *buf, size_t len) = 0;
             virtual ssize_t read(uint8_t *buf, size_t len) = 0;
@@ -44,11 +55,12 @@ namespace pos {
             int _local_fd;
 
         public:
-            local_file(int fd)
-            : _local_fd(::dup(fd))
+            local_file(int local_fd, int emulated_fd)
+            : _local_fd(::dup(local_fd)),
+              file(emulated_fd)
             {
                 if (_local_fd < 0) {
-                    fprintf(stderr, "unable to dup(), fd=%d\n", fd);
+                    fprintf(stderr, "unable to dup(), fd=%d\n", local_fd);
                     abort();
                 }
             }
@@ -92,7 +104,10 @@ namespace pos {
                 return ref->dup();
             }
 
+            std::shared_ptr<file> open_local_by_path(std::string path, int flags, int mode);
+
         private:
+            std::shared_ptr<file> mklocal(int fd);
             static std::map<int, std::shared_ptr<file>> mktable(int stdin, int stdout, int stderr);
         };
     }

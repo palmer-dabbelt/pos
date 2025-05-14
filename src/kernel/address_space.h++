@@ -129,6 +129,17 @@ namespace pos {
                 copy_to_va_all(vaddr, (uint8_t *)(s.c_str()), s.length() + 1);
             }
 
+            std::string va_to_string(va_t vaddr)
+            {
+                size_t count = 0;
+                while (readb(vaddr + count) != 0)
+                    count++;
+
+                char bytes[count + 1];
+                copy_from_va_all((uint8_t *)bytes, vaddr, count+1);
+                return std::string(bytes);
+            }
+
         private:
             pa_t palloc(void);
 
