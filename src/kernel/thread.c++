@@ -296,7 +296,6 @@ void thread::kvm::thread_main(void)
 
         auto stack_align = [&](long bytes) {
            regs.rsp += bytes - (regs.rsp % bytes);
-           fprintf(stderr, "0x%016llx\n", regs.rsp);
         };
 
         auto onstack_long = [&](long v) {
