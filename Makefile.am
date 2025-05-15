@@ -5,6 +5,7 @@ pos_SOURCES = \
 	src/kernel/address_space.c++ \
 	src/kernel/elf.c++ \
 	src/kernel/files.c++ \
+	src/kernel/gdb.c++ \
 	src/kernel/thread.c++ \
 	src/pos.c++
 

@@ -3,6 +3,7 @@
 #include <cstring>
 #include <optional>
 #include "kernel/elf.h++"
+#include "kernel/gdb.h++"
 
 void help(const char *argv0)
 {
@@ -12,6 +13,7 @@ void help(const char *argv0)
 int main(int argc, char **argv)
 {
     std::optional<size_t> command_offset;
+    std::optional<int> gdbserver_port;
 
     for (size_t i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "--") == 0) {
@@ -20,6 +22,9 @@ int main(int argc, char **argv)
         } else if (strcmp(argv[i], "--help") == 0) {
             help(argv[0]);
             return 0;
+        } else if (strcmp(argv[i], "--gdbserver") == 0) {
+            gdbserver_port = atoi(argv[i+1]);
+            i++;
         } else if (strncmp(argv[i], "--", 2) == 0) {
             help(argv[0]);
             return 1;
@@ -42,5 +47,11 @@ int main(int argc, char **argv)
         child_argv[i] = argv[i + command_offset.value()];
 
     auto thread = elf->create_init_thread(child_argv);
+
+    if (gdbserver_port.has_value()) {
+        auto m = pos::kernel::gdbserver(thread, gdbserver_port.value());
+        m.join();
+    }
+
     return thread->join();
 }
