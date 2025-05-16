@@ -32,7 +32,7 @@ public:
 
         do {
             count = read(fd, _buf + _len, 1);
-            if (count < 0)
+            if (count <= 0)
                 return;
 
             _len += count;
