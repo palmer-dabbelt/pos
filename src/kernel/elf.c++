@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0-or-later OR BSD-3-Clause OR Apache-2.0
 
 #include "elf.h++"
+#include "gnuelf.h"
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <elf.h>
 #include <fcntl.h>
 #include <unistd.h>
 using namespace pos::kernel;
