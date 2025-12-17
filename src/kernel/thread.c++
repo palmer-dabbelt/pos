@@ -9,16 +9,24 @@
 #endif
 
 #include "thread.h++"
-#include <linux/kvm.h>
-#include <sys/auxv.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <cstring>
+
+#ifdef HAVE_SYS_AUXV_H
+#include <sys/auxv.h>
+#endif
+
+#ifdef HAVE_KVM
+#include <linux/kvm.h>
+#endif
+
 using namespace pos::kernel;
 
+#if defined(__x86_64__)
 #define CR0_PE 1u
 #define CR0_MP (1U << 1)
 #define CR0_EM (1U << 2)
@@ -96,7 +104,9 @@ struct gdt_entry_bits {
 	unsigned int gran                   :  1; // 1 to use 4k page addressing, 0 for byte addressing
 	unsigned int base_high              :  8;
 } __attribute__((packed));
+#endif
 
+#ifdef HAVE_KVM
 void thread::kvm::thread_main(void)
 {
     /*
@@ -620,10 +630,11 @@ uint64_t thread::kvm::handle_syscall(uint64_t nr, uint64_t arg0,
         abort();
     }
 }
+#endif
 
 int thread::join(void)
 {
     vm.run();
-    vm.wait_for_state(kvm::thread_state::DONE);
-    return vm.regs.rdi;
+    vm.wait_for_done();
+    return vm.thread_return_code();
 }

@@ -8,6 +8,8 @@ pos_SOURCES = \
 	src/kernel/thread.c++ \
 	src/pos.c++
 
+pos_LDFLAGS = $(FRAMEWORKS)
+
 # Some simple tests for command-line argument handling
 TESTS = test/pos/help.bash
 XFAIL_TESTS = test/pos/noargs.bash

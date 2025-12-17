@@ -26,5 +26,16 @@ AC_ARG_ENABLE(
 	[CXXFLAGS="$CXXFLAGS -DPOS_DEBUG_SYSCALLS=1"]
 )
 
+AC_CHECK_FILE([/System/Library/Frameworks/Hypervisor.framework],
+              [has_osx_hypervisor=yes],
+              [has_osx_hypervisor=no])
+if test "x$has_osx_hypervisor" = "xyes"; then
+    FRAMEWORKS="$FRAMEWORKS -framework Hypervisor"
+    AC_DEFINE([HAVE_OSX_HYPERVISOR], [1], "Use the OSX hypervisor")
+fi
+AC_SUBST([FRAMEWORKS])
+
+AC_CHECK_HEADERS([sys/auxv.h])
+
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT

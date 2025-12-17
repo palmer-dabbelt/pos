@@ -5,10 +5,17 @@
 
 #include "address_space.h++"
 #include "files.h++"
-#include <linux/kvm.h>
 #include <condition_variable>
 #include <mutex>
 #include <thread>
+
+#ifdef HAVE_KVM
+#include <linux/kvm.h>
+#endif
+
+#ifdef HAVE_OSX_HYPERVISOR
+#include <Hypervisor/Hypervisor.h>
+#endif
 
 namespace pos {
     namespace kernel {
@@ -17,6 +24,7 @@ namespace pos {
          * local POS instance.
          */
         class thread {
+#ifdef HAVE_KVM
         private:
             class kvm {
             public:
@@ -42,7 +50,6 @@ namespace pos {
             public:
                 struct kvm_regs regs;
                 struct kvm_sregs sregs;
-                uint64_t phdr, phent, phnum, vdso;
 
             public:
                 kvm(address_space& _memory, decltype(files)& _files)
@@ -59,6 +66,8 @@ namespace pos {
                 {
                     kvm_thread.join();
                 }
+
+		void set_pc(uint64_t pc) { regs.rip = pc; }
 
                 void wait_for_state(thread_state s)
                 {
@@ -98,11 +107,42 @@ namespace pos {
                                         uint64_t arg3, uint64_t arg4,
                                         uint64_t arg5);
             };
+#endif
+
+#ifdef HAVE_OSX_HYPERVISOR
+	    class osx_hypervisor {
+	    private:
+                address_space& memory;
+                kernel::files& files;
+		hv_vcpu_t vcpu;
+
+	    public:
+	        osx_hypervisor(address_space& _memory, decltype(files)& _files)
+		: memory(_memory),
+		  files(_files)
+		{}
+
+	    public:
+	        void set_pc(uint64_t pc) { hv_vcpu_set_reg(vcpu, HV_REG_PC, pc); }
+		void run(void) {}
+		void done_with_init(void) {}
+		void wait_for_ready(void) {}
+		void wait_for_done(void) {}
+		uint64_t thread_return_code(void) { return -1; }
+	    };
+#endif
 
             address_space memory;
             kernel::files files;
+            uint64_t _phdr, _phent, _phnum, _vdso;
 
+#ifdef HAVE_KVM
             kvm vm;
+#endif
+
+#ifdef HAVE_OSX_HYPERVISOR
+	    osx_hypervisor vm;
+#endif
 
         public:
             thread(void)
@@ -114,13 +154,13 @@ namespace pos {
         public:
             auto& mem(void) { return memory; }
             int join(void);
-            void set_pc(uint64_t pc) { vm.regs.rip = pc; }
-            void set_phdr(uint64_t phdr) { vm.phdr = phdr; }
-            void set_phent(uint64_t phent) { vm.phent = phent; }
-            void set_phnum(uint64_t phnum) { vm.phnum = phnum; }
+            void set_pc(uint64_t pc) { vm.set_pc(pc); }
+            void set_phdr(uint64_t phdr) { _phdr = phdr; }
+            void set_phent(uint64_t phent) { _phent = phent; }
+            void set_phnum(uint64_t phnum) { _phnum = phnum; }
             void done_with_init(void) {
                 vm.done_with_init();
-                vm.wait_for_state(kvm::thread_state::READY);
+                vm.wait_for_ready();
             }
         };
     }
